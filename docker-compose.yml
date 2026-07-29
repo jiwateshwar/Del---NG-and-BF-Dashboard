@@ -1,0 +1,12 @@
+services:
+  rbt-dashboard:
+    build: .
+    image: rbt-ops-dashboard:latest
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - rbt_dashboard_data:/data
+
+volumes:
+  rbt_dashboard_data:
