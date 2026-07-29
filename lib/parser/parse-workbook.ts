@@ -29,6 +29,34 @@ function matchesDims(record: WidePivotRecord, match: Record<string, string>): bo
   return Object.entries(match).every(([k, v]) => record.dims[k] === v);
 }
 
+function slugify(label: string): string {
+  return label
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+/** Finds whichever dimension key (excluding `exclude`) holds "Count"/"Revenue"
+ * as its values — this is the same unnamed metric-type column the wide-pivot
+ * extractor surfaces as `col_N` on the `Interface`/`Price Point`/`Plan`
+ * sheets (see wide-pivot.ts), located by value rather than name since its
+ * header is blank in the source and the column index isn't stable. */
+function findMetricTypeDim(records: WidePivotRecord[], exclude: string[]): string | null {
+  const candidates = new Map<string, Set<string>>();
+  for (const rec of records) {
+    for (const [k, v] of Object.entries(rec.dims)) {
+      if (exclude.includes(k)) continue;
+      if (!candidates.has(k)) candidates.set(k, new Set());
+      candidates.get(k)!.add(v.toLowerCase());
+    }
+  }
+  for (const [k, values] of candidates) {
+    if (values.has("count") || values.has("revenue")) return k;
+  }
+  return null;
+}
+
 export function parseWorkbook(buffer: Buffer, config: AccountConfig): ParsedWorkbook {
   const warnings: string[] = [];
   const wb = loadWorkbook(buffer);
@@ -69,7 +97,8 @@ export function parseWorkbook(buffer: Buffer, config: AccountConfig): ParsedWork
     }
   }
 
-  // --- Deactivation (summed across all dimensions per date) ---
+  // --- Deactivation (summed across all dimensions per date, plus a
+  // breakdown by Interface when that sheet has one) ---
   if (config.deactivation) {
     const matrix = sheetToMatrix(wb, config.deactivation.sheet);
     if (!matrix) {
@@ -87,6 +116,60 @@ export function parseWorkbook(buffer: Buffer, config: AccountConfig): ParsedWork
           metricLabel: "Deactivations",
           value,
         });
+      }
+
+      const byInterfaceDate = new Map<string, number>();
+      for (const rec of records) {
+        const iface = rec.dims["Interface"];
+        if (!iface) continue;
+        const k = `${iface}||${rec.date}`;
+        byInterfaceDate.set(k, (byInterfaceDate.get(k) ?? 0) + rec.value);
+      }
+      for (const [key, value] of byInterfaceDate) {
+        const [iface, date] = key.split("||");
+        dailyMetrics.push({
+          date,
+          sheet: config.deactivation.sheet,
+          metricKey: `interface.${slugify(iface)}.deactivation`,
+          metricLabel: `Deactivations — ${iface}`,
+          value,
+        });
+      }
+    }
+  }
+
+  // --- Per-interface total volume (the `Interface` sheet has no per-KPI
+  // breakdown in these MIS exports — only a combined total per interface —
+  // so this is "Total (all KPIs)" by interface, not a per-KPI split). ---
+  {
+    const matrix = sheetToMatrix(wb, "Interface");
+    if (!matrix) {
+      warnings.push("Interface sheet not found — per-interface series skipped.");
+    } else {
+      const { records, warnings: w } = extractWidePivotBlocks(matrix, "Interface", { asOfDate });
+      warnings.push(...w);
+      const metricTypeDim = findMetricTypeDim(records, ["Interface"]);
+      if (!metricTypeDim) {
+        warnings.push("Interface sheet: could not find the Count/Revenue column — per-interface series skipped.");
+      } else {
+        const byKey = new Map<string, number>();
+        for (const rec of records) {
+          const iface = rec.dims["Interface"];
+          const metricType = rec.dims[metricTypeDim]?.toLowerCase();
+          if (!iface || (metricType !== "count" && metricType !== "revenue")) continue;
+          const key = `${iface}||${metricType}||${rec.date}`;
+          byKey.set(key, (byKey.get(key) ?? 0) + rec.value);
+        }
+        for (const [key, value] of byKey) {
+          const [iface, metricType, date] = key.split("||");
+          dailyMetrics.push({
+            date,
+            sheet: "Interface",
+            metricKey: `interface.${slugify(iface)}.total_${metricType}`,
+            metricLabel: `Total — ${iface} (${metricType === "count" ? "Count" : "Revenue"})`,
+            value,
+          });
+        }
       }
     }
   }

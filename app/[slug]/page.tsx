@@ -15,6 +15,7 @@ import { TrendChart } from "@/components/TrendChart";
 import { RangeToggle } from "@/components/RangeToggle";
 import { UploadWidget } from "@/components/UploadWidget";
 import { MetricsTable } from "@/components/MetricsTable";
+import { InterfaceCards } from "@/components/InterfaceCards";
 
 const BASE_SERIES_KEYS = ["base.active_base", "base.grace_base", "base.suspended_base"];
 
@@ -108,6 +109,7 @@ export default function AccountDashboard({ params }: { params: Promise<{ slug: s
               label={kpi.label}
               countFields={kpi.metrics["Count"]}
               revenueFields={kpi.metrics["Revenue"]}
+              benchmark={kpi.benchmark}
             />
           ))}
         </div>
@@ -181,6 +183,17 @@ export default function AccountDashboard({ params }: { params: Promise<{ slug: s
             </div>
           </div>
         </div>
+      </section>
+
+      <section>
+        <h2 className="text-sm font-medium mb-1" style={{ color: "var(--text-secondary)" }}>
+          By Interface
+        </h2>
+        <p className="text-xs mb-3" style={{ color: "var(--text-muted)" }}>
+          Total transaction volume and deactivations per interface, each against its all-time daily best. The source
+          MIS doesn&apos;t break New Activation/Renewal/etc. out by interface, only the combined total.
+        </p>
+        <InterfaceCards series={metrics?.series ?? []} />
       </section>
 
       <section>

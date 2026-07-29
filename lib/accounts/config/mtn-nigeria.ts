@@ -21,7 +21,13 @@ const config: AccountConfig = {
     series: [
       { key: "active_base", label: "Active Base", match: { "Subscription Type": "RBT-Tone", "User Status": "Active" } },
       { key: "grace_base", label: "Grace Base", match: { "Subscription Type": "RBT-Tone", "User Status": "Grace" } },
-      { key: "suspended_base", label: "Suspended Base", match: { "Subscription Type": "RBT-Tone", "User Status": "Suspended" } },
+      // Label deliberately matches the Dashboard sheet's own typo
+      // ("Suspened") rather than correcting it — this lets the
+      // KPI-benchmark lookup match this series to its Dashboard KPI row by
+      // exact label text. (The `match` filter below is unrelated — that's
+      // matching the Base sheet's own "User Status" value, which MTN's
+      // sheet spells correctly as "Suspended".)
+      { key: "suspended_base", label: "Suspened Base", match: { "Subscription Type": "RBT-Tone", "User Status": "Suspended" } },
     ],
   },
   deactivation: {

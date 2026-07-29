@@ -23,9 +23,15 @@ export interface KpiFieldValues {
   month_proj_growth_pct: number | null;
 }
 
+export interface BenchmarkSide {
+  latest: number | null;
+  best: number | null;
+}
+
 export interface KpiEntry {
   label: string;
   metrics: Record<string, KpiFieldValues>;
+  benchmark: { count: BenchmarkSide; revenue: BenchmarkSide };
 }
 
 export interface KpisResponse {
@@ -42,6 +48,7 @@ export interface Series {
   metricKey: string;
   metricLabel: string;
   points: SeriesPoint[];
+  allTimeMax: number | null;
 }
 
 export interface MetricsResponse {

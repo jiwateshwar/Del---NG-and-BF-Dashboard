@@ -232,6 +232,14 @@ export function extractWidePivotBlocks(
       );
     }
 
+    interface PendingRow {
+      yearVal: number;
+      monthVal: number;
+      dims: Record<string, string>;
+      rowValues: { day: number; value: number | null }[];
+    }
+    const pendingRows: PendingRow[] = [];
+
     for (let r = dataStartRow; r <= Math.min(dataEndRow, matrix.length - 1); r++) {
       const offset = r - dataStartRow;
       const rawRow = matrix[r] ?? [];
@@ -250,23 +258,32 @@ export function extractWidePivotBlocks(
         if (!isBlank(v)) dims[dim.name] = asText(v);
       }
 
-      // Excel pads a wide pivot's day columns out to the full 1-31 grid
-      // regardless of how many days have actually happened, showing a
-      // literal 0 rather than blank for not-yet-reached days at the end of
-      // the current month. A trailing run of exact zeros right after a
-      // non-zero value on the same row is that padding, not real data — a
-      // row that's genuinely zero from day 1 (no trailing non-zero before
-      // it) is left untouched.
-      const rowValues = dayColumns.map(({ colIndex, day }) => ({ day, colIndex, value: asNumber(rawRow[colIndex]) }));
-      let trailingPaddingStart = rowValues.length;
-      for (let i = rowValues.length - 1; i >= 0; i--) {
-        if (rowValues[i].value === 0) trailingPaddingStart = i;
-        else break;
-      }
-      const hasRealValueBeforePadding = rowValues.slice(0, trailingPaddingStart).some((r) => (r.value ?? 0) !== 0);
-      const paddingCutoff = hasRealValueBeforePadding ? trailingPaddingStart : rowValues.length;
+      const rowValues = dayColumns.map(({ colIndex, day }) => ({ day, value: asNumber(rawRow[colIndex]) }));
+      pendingRows.push({ yearVal, monthVal, dims, rowValues });
+    }
 
-      rowValues.slice(0, paddingCutoff).forEach(({ day, value }) => {
+    // Excel pads a wide pivot's day columns out to the full 1-31 grid
+    // regardless of how many days have actually happened, showing a literal
+    // 0 rather than blank for not-yet-reached days at the end of the
+    // current month. Figure out the real cutoff per (year, month) from
+    // whichever rows in that month DO have activity, then apply it to every
+    // row in that month — including rows that are genuinely all-zero for
+    // their own real days, which otherwise look identical to padding.
+    const monthCutoff = new Map<string, number>(); // "year-month" -> last real day-index
+    for (const { yearVal, monthVal, rowValues } of pendingRows) {
+      let lastNonZero = -1;
+      for (let i = 0; i < rowValues.length; i++) {
+        if ((rowValues[i].value ?? 0) !== 0) lastNonZero = i;
+      }
+      if (lastNonZero === -1) continue;
+      const key = `${yearVal}-${monthVal}`;
+      monthCutoff.set(key, Math.max(monthCutoff.get(key) ?? -1, lastNonZero));
+    }
+
+    for (const { yearVal, monthVal, dims, rowValues } of pendingRows) {
+      const key = `${yearVal}-${monthVal}`;
+      const cutoff = monthCutoff.get(key) ?? rowValues.length - 1;
+      rowValues.slice(0, cutoff + 1).forEach(({ day, value }) => {
         if (value === null) return;
         records.push({
           sheet: sheetName,

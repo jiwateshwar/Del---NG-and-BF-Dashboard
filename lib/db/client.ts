@@ -166,6 +166,29 @@ export function getDailyMetrics(
   return stmt.all(...args) as unknown as DailyMetricRow[];
 }
 
+/** All-time max value ever recorded per metric (the daily grain, regardless
+ * of what range/granularity the caller is currently displaying) — used as
+ * the "best day ever" benchmark line on KPI cards. */
+export function getMetricMaxValues(
+  accountSlug: string,
+  metricKeys?: string[]
+): Record<string, number> {
+  const database = getDb();
+  const clauses = ["account_slug = ?"];
+  const args: (string | number)[] = [accountSlug];
+  if (metricKeys && metricKeys.length > 0) {
+    clauses.push(`metric_key IN (${metricKeys.map(() => "?").join(",")})`);
+    args.push(...metricKeys);
+  }
+  const stmt = database.prepare(
+    `SELECT metric_key, MAX(value) as max_value FROM daily_metrics WHERE ${clauses.join(" AND ")} GROUP BY metric_key`
+  );
+  const rows = stmt.all(...args) as unknown as { metric_key: string; max_value: number }[];
+  const out: Record<string, number> = {};
+  for (const row of rows) out[row.metric_key] = row.max_value;
+  return out;
+}
+
 export interface UploadRow {
   id: number;
   account_slug: string;

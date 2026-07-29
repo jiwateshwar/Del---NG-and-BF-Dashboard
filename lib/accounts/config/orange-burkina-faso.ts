@@ -14,7 +14,10 @@ const config: AccountConfig = {
     series: [
       { key: "active_base", label: "Active Base", match: { TRANSACTION_TYPE: "TONE BASE", STATUS: "Active" } },
       { key: "grace_base", label: "Grace Base", match: { TRANSACTION_TYPE: "TONE BASE", STATUS: "Grace" } },
-      { key: "suspended_base", label: "Suspended Base", match: { TRANSACTION_TYPE: "TONE BASE", STATUS: "Suspened" } },
+      // Label deliberately matches the sheet's own typo ("Suspened") rather
+      // than correcting it — this lets the KPI-benchmark lookup match this
+      // series to its Dashboard-sheet KPI row by exact label text.
+      { key: "suspended_base", label: "Suspened Base", match: { TRANSACTION_TYPE: "TONE BASE", STATUS: "Suspened" } },
     ],
   },
   deactivation: {

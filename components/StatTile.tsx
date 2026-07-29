@@ -1,4 +1,5 @@
-import type { KpiFieldValues } from "@/lib/client/api";
+import type { KpiFieldValues, BenchmarkSide } from "@/lib/client/api";
+import { BenchmarkMeter } from "./BenchmarkMeter";
 
 function formatNumber(v: number | null, isRevenue: boolean): string {
   if (v === null || v === undefined) return "—";
@@ -28,10 +29,12 @@ export function StatTile({
   label,
   countFields,
   revenueFields,
+  benchmark,
 }: {
   label: string;
   countFields?: KpiFieldValues;
   revenueFields?: KpiFieldValues;
+  benchmark?: { count: BenchmarkSide; revenue: BenchmarkSide };
 }) {
   return (
     <div
@@ -57,6 +60,9 @@ export function StatTile({
         LMTD {formatNumber(countFields?.lmtd ?? null, false)} &middot; Last month{" "}
         {formatNumber(countFields?.last_month ?? null, false)}
       </div>
+      {benchmark?.count && (
+        <BenchmarkMeter latest={benchmark.count.latest} best={benchmark.count.best} label="Best day (count)" />
+      )}
     </div>
   );
 }

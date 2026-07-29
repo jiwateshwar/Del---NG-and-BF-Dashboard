@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { bootstrap } from "@/lib/db/bootstrap";
 import { getAccount } from "@/lib/accounts/registry";
-import { getDailyMetrics } from "@/lib/db/client";
+import { getDailyMetrics, getMetricMaxValues } from "@/lib/db/client";
 import { toDailySeries, toWeeklySeries } from "@/lib/metrics/aggregate";
 
 export async function GET(request: Request, { params }: { params: Promise<{ slug: string }> }) {
@@ -22,5 +22,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
   const rows = getDailyMetrics(slug, { from, to, metricKeys });
   const series = granularity === "weekly" ? toWeeklySeries(rows) : toDailySeries(rows);
 
-  return NextResponse.json({ granularity, series });
+  // "Best day ever" benchmark: the all-time daily max, independent of the
+  // currently-displayed date range/granularity.
+  const allTimeMax = getMetricMaxValues(slug, metricKeys);
+  const seriesWithBenchmark = series.map((s) => ({ ...s, allTimeMax: allTimeMax[s.metricKey] ?? null }));
+
+  return NextResponse.json({ granularity, series: seriesWithBenchmark });
 }
