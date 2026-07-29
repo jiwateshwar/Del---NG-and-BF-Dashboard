@@ -2,7 +2,7 @@
 // particular sheet's structure so the same primitives work across accounts
 // whose pivot layouts differ (column offsets, dimension names, category values).
 
-export type CellValue = string | number | Date | null;
+export type CellValue = string | number | null;
 export type Matrix = CellValue[][];
 
 const MONTH_NAMES: Record<string, number> = {
